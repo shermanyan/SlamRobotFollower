@@ -1,0 +1,40 @@
+<launch>
+  <arg name="rviz_arg" default="-d $(find SlamRobotFollower)/rviz/explore.rviz" />
+
+  <arg name="world_name" default="$(find SlamRobotFollower)/worlds/slam_maze.world"/>
+  <arg name="model" default="burger" doc="model type [burger, waffle, waffle_pi]"/>
+  <arg name="x_pos" default="0.0"/>
+  <arg name="y_pos" default="0.0"/>
+  <arg name="z_pos" default="0.0"/>
+
+  <!-- Include the Gazebo empty world launch file with the custom world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world_name)"/>
+  </include>
+
+  <!-- Load the robot description -->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+  <!-- Spawn the robot in Gazebo -->
+  <node pkg="gaze
+  bo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -param robot_description" />
+
+  <!-- Include the robot description launch file -->
+  <include file="$(find turtlebot3_bringup)/launch/includes/description.launch.xml">
+    <arg name="model" value="$(arg model)" />
+  </include>
+
+  <!-- Turtlebot3 Navigation -->
+  <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
+    <arg name="model" value="$(arg model)"/>
+  </include>
+
+  <!-- Turtlebot3 SLAM -->
+  <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
+    <arg name="slam_methods" value="gmapping" />
+    <arg name="open_rviz" value="false" /> 
+  </include>
+
+  <!-- Rviz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="$(arg rviz_arg)"/>
+</launch>
