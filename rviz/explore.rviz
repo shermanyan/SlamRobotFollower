@@ -6,7 +6,7 @@ Panels:
       Expanded:
         - /TF1/Frames1
         - /Global Map1
-        - /visualization_marker1
+        - //search_boundary1
       Splitter Ratio: 0.594406008720398
     Tree Height: 584
   - Class: rviz/Selection
@@ -172,22 +172,22 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Global Cost Map
       Topic: /move_base/global_costmap/costmap
       Unreliable: false
       Use Timestamp: false
-      Value: false
+      Value: true
     - Alpha: 0.699999988079071
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Local Cost Map
       Topic: /move_base/local_costmap/costmap
       Unreliable: false
       Use Timestamp: false
-      Value: false
+      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -260,13 +260,14 @@ Visualization Manager:
       Topic: /move_base/NavfnROS/plan
       Unreliable: false
       Value: true
-    - Class: rviz/Marker
+    - Alpha: 1
+      Class: rviz/Polygon
+      Color: 25; 255; 0
       Enabled: true
-      Marker Topic: visualization_marker
-      Name: visualization_marker
-      Namespaces:
-        {}
+      Name: /search_boundary
       Queue Size: 10
+      Topic: /search_boundary
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:
@@ -305,7 +306,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 35.73463439941406
+      Scale: 46.78340530395508
       Target Frame: map
       X: -3.313446521759033
       Y: 1.9922752380371094

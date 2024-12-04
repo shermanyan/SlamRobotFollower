@@ -42,13 +42,13 @@
   <node name="rviz" pkg="rviz" type="rviz" args="$(arg rviz_arg)"/>
 
   <!-- Add the Explorer Node -->
-  <node pkg="SlamRobotFollower" type="explore.py" name="maze_explorer" output="screen">
+  <!-- <node pkg="SlamRobotFollower" type="explore.py" name="maze_explorer" output="screen">
     <param name="boundary_length" value="$(arg boundary_length)" />
     <param name="boundary_width" value="$(arg boundary_width)" />
     <param name="start_x" value="$(arg start_x)" />
     <param name="start_y" value="$(arg start_y)" />
     <param name="use_sim_time" value="true" />
-  </node>
+  </node> -->
 
 
 </launch>
