@@ -18,7 +18,7 @@ class MazeExplorer:
                  bound_start_x=-1.0, 
                  bound_start_y=-1.0, 
                  num_random_points=100, 
-                 tolerance=3,
+                 tolerance=4,
                  robot_name='tb3_0'
                  ):
         
@@ -26,7 +26,6 @@ class MazeExplorer:
 
         self.current_position = None
         self.current_goal = None
-        self.explored = False
 
         # Parameters
         self.boundary_length = rospy.get_param('~boundary_length', boundary_length)
@@ -59,6 +58,13 @@ class MazeExplorer:
         self.polygon_pub = rospy.Publisher('/search_boundary', PolygonStamped, queue_size=10)
         self.map_pub = rospy.Publisher(f'{self.robot_name}/map', OccupancyGrid, queue_size=10)
 
+        self.robot_ctrl_pub = rospy.Publisher(f'{self.robot_name}/cmd_vel', Twist, queue_size=10)
+
+        while (True):
+            ctrl_msg = Twist()
+            ctrl_msg.angular.z = 1
+            self.robot_ctrl_pub.publish(ctrl_msg)
+
         self.init_boundary()
         self.generate_random_points()
 
@@ -67,11 +73,6 @@ class MazeExplorer:
         self.move_base_client = actionlib.SimpleActionClient(f'/{self.robot_name}/move_base', MoveBaseAction)
         self.move_base_client.wait_for_server()
 
-
-        self.robot_ctrl_pub = rospy.Publisher(f'{self.robot_name}/cmd_vel', Twist, queue_size=10)
-        self.move_base_ctrl_sub = rospy.Subscriber("/cmd_vel", Twist, self.remap_cmd_vel)
-
-
     def odom_callback(self, msg):
         '''Callback to process the odometry data.'''
         pose = msg.pose.pose
@@ -79,18 +80,7 @@ class MazeExplorer:
         _, _, theta = euler_from_quaternion([orientation.x, orientation.y, orientation.z, orientation.w])
         self.current_position = {"x": pose.position.x, "y": pose.position.y, "theta": theta}
 
-    def remap_cmd_vel(self,msg):
-        twist_msg = Twist()
-        twist_msg.linear.x = msg.linear.x
-        twist_msg.linear.y = msg.linear.y
-        twist_msg.linear.z = msg.linear.z
-        twist_msg.angular.x = msg.angular.x
-        twist_msg.angular.y = msg.angular.y
-        twist_msg.angular.z = msg.angular.z
-        self.robot_ctrl_pub.publish(twist_msg)
-
     def map_callback(self, map_msg):
-
         self.map_data = np.array(map_msg.data).reshape((map_msg.info.height, map_msg.info.width))
         self.resolution = map_msg.info.resolution
         self.origin = (map_msg.info.origin.position.x, map_msg.info.origin.position.y)
@@ -222,7 +212,6 @@ class MazeExplorer:
         if self.current_goal and goal_reached:
             self.move_to_next_frontier()
 
-
     def send_goal(self, x, y):
         """Send a navigation goal to move_base."""
         goal = MoveBaseGoal()
@@ -235,7 +224,7 @@ class MazeExplorer:
         rospy.loginfo(f"Sending goal: ({x:.2f}, {y:.2f})")
         self.current_goal = (x, y)
         self.move_base_client.send_goal(goal)
-        # rospy.loginfo(goal)
+        rospy.loginfo(goal)
 
     def move_to_next_frontier(self):
         """Move to the next unexplored frontier."""
@@ -244,9 +233,8 @@ class MazeExplorer:
             if next_frontier:
                 self.send_goal(*next_frontier)
         else:
+            self.send_goal(0,0)
             rospy.loginfo("All frontiers explored.")
-            self.explored = True
-
 
     def find_nearest_frontier(self):
         """Find the nearest unexplored frontier using Manhattan distance."""
@@ -273,10 +261,6 @@ class MazeExplorer:
             self.mark_boundary_walls_as_obstacles()
             self.publish_boundary()
 
-            if (self.explored):
-                rospy.loginfo("Exploration completed.")
-                break
-
             rate.sleep()
 
         rospy.loginfo("Exploration finished. Shutting down.")
@@ -290,7 +274,7 @@ if __name__ == '__main__':
         parser.add_argument('--bound_start_x', type=float, default=-1.0, help='Starting x-coordinate of the boundary')
         parser.add_argument('--bound_start_y', type=float, default=-1.0, help='Starting y-coordinate of the boundary')
         parser.add_argument('--num_random_points', type=int, default=200, help='Number of random points for exploration')
-        parser.add_argument('--tolerance', type=int, default=3, help='Tolerance for frontier exploration')
+        parser.add_argument('--tolerance', type=int, default=4, help='Tolerance for frontier exploration')
         parser.add_argument('--robot_name', type=str, default='tb3_0', help='Name of the robot')
 
         args = parser.parse_args()
@@ -303,7 +287,7 @@ if __name__ == '__main__':
                     tolerance=args.tolerance,
                     robot_name=args.robot_name)
         
-        explorer.explore()
+        # explorer.explore()
 
     except rospy.ROSInterruptException:
         rospy.loginfo("Exploration interrupted.")

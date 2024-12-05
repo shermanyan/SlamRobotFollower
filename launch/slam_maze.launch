@@ -1,35 +1,69 @@
 <launch>
+  <arg name="rviz_arg" default="-d $(find SlamRobotFollower)/rviz/explore.rviz" />
+  <arg name="world_name" default="$(find SlamRobotFollower)/worlds/slam_maze.world"/>
+  <arg name="model" default="burger" doc="model type [burger, waffle, waffle_pi]"/>
+  <arg name="z_pos" default="0.0"/>
 
-    <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
-    <arg name="x_pos" default="0.0"/>
-    <arg name="y_pos" default="0.0"/>
-    <arg name="z_pos" default="0.0"/>
+  <!-- Maze Parameters -->
+  <arg name="boundary_length" default="100.0" />
+  <arg name="boundary_width" default="100.0" />
+  <arg name="start_x" default="0.0" />
+  <arg name="start_y" default="0.0" />
 
-    <include file="$(find gazebo_ros)/launch/empty_world.launch">
-        <arg name="world_name" value="$(find SlamRobotFollower)/worlds/slam_maze.world"/>
-        <arg name="paused" value="false"/>
-        <!-- <arg name="paused" value="true"/> -->
-        <arg name="use_sim_time" value="true"/>
-        <arg name="gui" value="true"/>
-        <arg name="headless" value="false"/>
-        <arg name="debug" value="false"/>
-    </include>
 
-    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
-    <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -param robot_description" />
+  <!-- Include the Gazebo empty world launch file with the custom world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world_name)"/>
+  </include>
 
-    <arg name="multi_robot_name" default=""/>
+  <!-- Load the robot description -->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
 
-    <include file="$(find turtlebot3_bringup)/launch/includes/description.launch.xml">
-        <arg name="model" value="$(arg model)" />
-    </include>
+  <!-- Spawn the robot in Gazebo -->
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg start_x) -y $(arg start_y) -z $(arg z_pos) -param robot_description" />
 
-    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
-        <param name="publish_frequency" type="double" value="50.0" />
-        <param name="tf_prefix" value="$(arg multi_robot_name)"/>
-    </node>
+  <!-- Include the robot description launch file -->
+  <include file="$(find turtlebot3_bringup)/launch/includes/description.launch.xml">
+    <arg name="model" value="$(arg model)" />
+  </include>
 
-    <node pkg="rviz" type="rviz" name="odometry_rviz" args="-d $(find SlamRobotFollower)/rviz/development.rviz" />  
+  <!-- Turtlebot3 SLAM -->
+  <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
+    <arg name="slam_methods" value="gmapping" />
+    <arg name="open_rviz" value="false" /> 
+  </include>
+
+  <!-- Rviz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="$(arg rviz_arg)"/>
+
+  
+  <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
+    <arg name="model" value="burger"/>
+  </include>
+
+  <!-- Global Costmap -->
+  <param name="move_base/global_costmap/static_map" value="true" />
+  <param name="move_base/global_costmap/inflation_radius" value="0.4" />
+  <param name="move_base/global_costmap/obstacle_range" value="3.0" />
+
+  <!-- Local Costmap -->
+  <param name="move_base/local_costmap/static_map" value="false" />
+  <param name="move_base/local_costmap/inflation_radius" value="0.2" />
+  <param name="move_base/local_costmap/obstacle_range" value="1.5" />
+  <param name="move_base/local_costmap/width" value="2.0" />
+  <param name="move_base/local_costmap/height" value="2.0" />
+
+  <!-- Robot Footprint -->
+  <param name="robot_radius" value="0.05" />
+  <param name="footprint_padding" value="0.02" />
+
+  <!-- Planner Biases -->
+  <param name="move_base/TrajectoryPlannerROS/path_distance_bias" value="50.0" />
+  <param name="move_base/TrajectoryPlannerROS/goal_distance_bias" value="10.0" />
+  <param name="move_base/TrajectoryPlannerROS/occdist_scale" value="0.01" />
+
+  <!-- Obstacle Distance -->
+  <param name="move_base/TrajectoryPlannerROS/min_obstacle_dist" value="0.1" />
 
 
 </launch>

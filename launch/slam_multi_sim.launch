@@ -1,0 +1,65 @@
+<launch>
+  <arg name="rviz_arg" default="-d $(find SlamRobotFollower)/rviz/explore.rviz" />
+  <arg name="world_name" default="$(find SlamRobotFollower)/worlds/slam_maze.world"/>
+
+  <!-- Arguments for the robots -->
+  <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
+  <arg name="first_tb3"  default="tb3_0"/>
+  <arg name="second_tb3" default="tb3_1"/>
+  <arg name="third_tb3"  default="tb3_2"/>
+
+  <arg name="first_tb3_x_pos" default="0.0"/>
+  <arg name="first_tb3_y_pos" default="0.0"/>
+  <arg name="first_tb3_z_pos" default="0.0"/>
+  <arg name="first_tb3_yaw"   default="0.0"/>
+
+  <arg name="second_tb3_x_pos" default="-0.2"/>
+  <arg name="second_tb3_y_pos" default="0.0"/>
+  <arg name="second_tb3_z_pos" default="0.0"/>
+  <arg name="second_tb3_yaw"   default="0.0"/>
+
+  <!-- Gazebo -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world_name)" />
+  </include>
+
+  <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+  <!-- Robot 1 -->
+  <group ns="$(arg first_tb3)">
+    <!-- Robot 1 Description -->
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+    <!-- Spawn Robot 1 -->
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg first_tb3) -x $(arg first_tb3_x_pos) -y $(arg first_tb3_y_pos) -z $(arg first_tb3_z_pos) -Y $(arg first_tb3_yaw) -param robot_description" />
+
+    <!-- SLAM for Robot 1 -->
+    <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
+      <arg name="slam_methods" value="gmapping" />
+      <arg name="open_rviz" value="false" />
+      <param name="tf_prefix" value="$(arg first_tb3)" />
+    </include>
+
+    <!-- Navigation for Robot 1 -->
+    <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
+      <param name="tf_prefix" value="$(arg first_tb3)" />
+      <remap from="/cmd_vel" to="/$(arg first_tb3)/cmd_vel" />
+      <remap from="/scan" to="/$(arg first_tb3)/scan" />
+      <remap from="/odom" to="/$(arg first_tb3)/odom" />
+      <remap from="/map" to="/$(arg first_tb3)/map" />
+    </include>
+  </group>
+
+  <!-- Robot 2 -->
+  <group ns="$(arg second_tb3)">
+    <!-- Robot 2 Description -->
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro" />
+
+    <!-- Spawn Robot 2 -->
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model $(arg second_tb3) -x $(arg second_tb3_x_pos) -y $(arg second_tb3_y_pos) -z $(arg second_tb3_z_pos) -Y $(arg second_tb3_yaw) -param robot_description" />
+
+  </group>
+
+  <!-- RViz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find SlamRobotFollower)/rviz/explore.rviz" />
+</launch>
