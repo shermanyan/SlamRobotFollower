@@ -27,11 +27,6 @@
     <arg name="model" value="$(arg model)" />
   </include>
 
-  <!-- Turtlebot3 Navigation -->
-  <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
-    <arg name="model" value="$(arg model)"/>
-  </include>
-
   <!-- Turtlebot3 SLAM -->
   <include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
     <arg name="slam_methods" value="gmapping" />
@@ -41,14 +36,34 @@
   <!-- Rviz -->
   <node name="rviz" pkg="rviz" type="rviz" args="$(arg rviz_arg)"/>
 
-  <!-- Add the Explorer Node -->
-  <!-- <node pkg="SlamRobotFollower" type="explore.py" name="maze_explorer" output="screen">
-    <param name="boundary_length" value="$(arg boundary_length)" />
-    <param name="boundary_width" value="$(arg boundary_width)" />
-    <param name="start_x" value="$(arg start_x)" />
-    <param name="start_y" value="$(arg start_y)" />
-    <param name="use_sim_time" value="true" />
-  </node> -->
+  
+  <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
+    <arg name="model" value="burger"/>
+  </include>
+
+<!-- Global Costmap -->
+<param name="move_base/global_costmap/static_map" value="true" />
+<param name="move_base/global_costmap/inflation_radius" value="0.4" />
+<param name="move_base/global_costmap/obstacle_range" value="3.0" />
+
+<!-- Local Costmap -->
+<param name="move_base/local_costmap/static_map" value="false" />
+<param name="move_base/local_costmap/inflation_radius" value="0.2" />
+<param name="move_base/local_costmap/obstacle_range" value="1.5" />
+<param name="move_base/local_costmap/width" value="2.0" />
+<param name="move_base/local_costmap/height" value="2.0" />
+
+<!-- Robot Footprint -->
+<param name="robot_radius" value="0.05" />
+<param name="footprint_padding" value="0.02" />
+
+<!-- Planner Biases -->
+<param name="move_base/TrajectoryPlannerROS/path_distance_bias" value="50.0" />
+<param name="move_base/TrajectoryPlannerROS/goal_distance_bias" value="10.0" />
+<param name="move_base/TrajectoryPlannerROS/occdist_scale" value="0.01" />
+
+<!-- Obstacle Distance -->
+<param name="move_base/TrajectoryPlannerROS/min_obstacle_dist" value="0.1" />
 
 
 </launch>

@@ -1,140 +1,272 @@
 #!/usr/bin/env python3
-"""
-MazeExplorer: Autonomous exploration of a maze with boundary constraints.
-SUBSCRIBERS:
-  - /map (nav_msgs/OccupancyGrid): Represents the occupancy grid map of the environment.
-PUBLISHERS:
-  - /move_base_simple/goal (geometry_msgs/PoseStamped): Sends navigation goals to the robot.
-"""
 
 import rospy
+from geometry_msgs.msg import PolygonStamped, Point32, PoseStamped
+from visualization_msgs.msg import Marker, MarkerArray
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from nav_msgs.msg import OccupancyGrid, Odometry
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import actionlib
 import numpy as np
-from actionlib_msgs.msg import GoalStatus
-from nav_msgs.msg import OccupancyGrid
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from geometry_msgs.msg import Point, Pose, Quaternion
 import random
-from math import sqrt
+import math
+import argparse
 
 class MazeExplorer:
+    def __init__(self, boundary_length=6.0, boundary_width=6.0, bound_start_x=-1.0, bound_start_y=-1.0, num_random_points=200, tolerance=4):
+        rospy.init_node('maze_explorer')
 
-    def __init__(self):
-        """Initialize MazeExplorer"""
-        rospy.init_node('maze_explorer', log_level=rospy.DEBUG)
-        
-        # Map parameters
+        self.current_position = None
+        self.current_goal = None
+
+        # Parameters
+        self.boundary_length = rospy.get_param('~boundary_length', boundary_length)
+        self.boundary_width = rospy.get_param('~boundary_width', boundary_width)
+        self.bound_start_x = rospy.get_param('~bound_start_x', bound_start_x)
+        self.bound_start_y = rospy.get_param('~bound_start_y', bound_start_y)
+        self.num_random_points = rospy.get_param('~num_random_points', num_random_points)
+        self.tolerance = rospy.get_param('~tolerance', tolerance)
+
+        self.boundary_min_x = self.bound_start_x
+        self.boundary_max_x = self.bound_start_x + self.boundary_length
+        self.boundary_min_y = self.bound_start_y
+        self.boundary_max_y = self.bound_start_y + self.boundary_width
+
         self.map_data = None
-        self.resolution = None
-        self.origin = None
-        self.map_width = None
-        self.map_height = None
-        self.sub_map = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
+        self.resolution = 0
+        self.origin = (0, 0)
 
-        # Robot starting position (home)
-        self.home_position = (0, 0)
+        # Random points for exploration
+        self.frontiers = []
+        self.remaining_frontiers = []
 
-        # Move Base Action Client
-        self.move_base = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-        self.move_base.wait_for_server()
-        rospy.loginfo("Connected to move_base server.")
+        # Subscribers
+        self.odom_sub = rospy.Subscriber("/odom", Odometry, self.odom_callback)
+        self.map_sub = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
 
-        rospy.sleep(2)  # Wait for initial map updates
+        # Publishers
+        self.marker_pub = rospy.Publisher('/exploration_markers', MarkerArray, queue_size=10)
+        self.polygon_pub = rospy.Publisher('/search_boundary', PolygonStamped, queue_size=10)
+        self.map_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
 
-    def map_callback(self, data):
-        """Callback to update map data."""
-        self.map_data = np.array(data.data).reshape((data.info.height, data.info.width))
-        self.resolution = data.info.resolution
-        self.origin = (data.info.origin.position.x, data.info.origin.position.y)
-        self.map_width = data.info.width
-        self.map_height = data.info.height
+        self.init_boundary()
+        self.generate_random_points()
 
-    def generate_random_points(self, num_points):
-        """Generate a grid of random points within the map boundary."""
-        points = []
-        for _ in range(num_points):
-            row = random.randint(0, self.map_height - 1)
-            col = random.randint(0, self.map_width - 1)
-            x = col * self.resolution + self.origin[0]
-            y = row * self.resolution + self.origin[1]
-            points.append((x, y))
-        return points
+        self.move_base_client = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
+        self.move_base_client.wait_for_server()
 
-    def find_nearest_frontier(self, points, robot_position):
-        """Find the nearest unexplored point from the robot's current position."""
-        unexplored_points = [
-            point for point in points if self.is_unexplored(point)
-        ]
-        if not unexplored_points:
-            return None
+    def odom_callback(self, msg):
+        '''Callback to process the odometry data.'''
+        pose = msg.pose.pose
+        orientation = pose.orientation
+        _, _, theta = euler_from_quaternion([orientation.x, orientation.y, orientation.z, orientation.w])
+        self.current_position = {"x": pose.position.x, "y": pose.position.y, "theta": theta}
 
-        nearest_point = min(
-            unexplored_points,
-            key=lambda p: sqrt((p[0] - robot_position[0])**2 + (p[1] - robot_position[1])**2)
-        )
-        return nearest_point
+    def map_callback(self, map_msg):
+        self.map_data = np.array(map_msg.data).reshape((map_msg.info.height, map_msg.info.width))
+        self.resolution = map_msg.info.resolution
+        self.origin = (map_msg.info.origin.position.x, map_msg.info.origin.position.y)
+        self.update_frontiers()
+        self.publish_markers()
 
-    def is_unexplored(self, point):
-        """Check if a point is unexplored on the map."""
-        col = int((point[0] - self.origin[0]) / self.resolution)
-        row = int((point[1] - self.origin[1]) / self.resolution)
-        if 0 <= row < self.map_height and 0 <= col < self.map_width:
-            return self.map_data[row, col] == -1  # -1 indicates unexplored
-        return False
+    def init_boundary(self):
+        """Initialize the boundary polygon."""
+        self.polygon = PolygonStamped()
+        self.polygon.header.frame_id = "map"
 
-    def set_goal(self, point):
-        """Send a goal to move_base."""
+        points = [Point32(x=self.boundary_min_x, y=self.boundary_min_y),
+                  Point32(x=self.boundary_min_x, y=self.boundary_max_y),
+                  Point32(x=self.boundary_max_x, y=self.boundary_max_y),
+                  Point32(x=self.boundary_max_x, y=self.boundary_min_y)]
+
+        self.polygon.polygon.points = points
+
+    def mark_boundary_walls_as_obstacles(self):
+            
+            """Mark the boundary walls as obstacles in the map."""
+            if self.map_data is None:
+                return
+            
+            # Convert boundary coordinates (in meters) to map grid indices
+            min_x_idx = int((self.boundary_min_x - self.origin[0]) / self.resolution)
+            max_x_idx = int((self.boundary_max_x - self.origin[0]) / self.resolution)
+            min_y_idx = int((self.boundary_min_y - self.origin[1]) / self.resolution)
+            max_y_idx = int((self.boundary_max_y - self.origin[1]) / self.resolution)
+
+            # Mark the walls (edges) of the boundary as obstacles
+            # Top and bottom walls
+            self.map_data[min_y_idx, min_x_idx:max_x_idx] = 100
+            self.map_data[max_y_idx, min_x_idx:max_x_idx] = 100
+
+            # Left and right walls
+            self.map_data[min_y_idx:max_y_idx, min_x_idx] = 100
+            self.map_data[min_y_idx:max_y_idx, max_x_idx] = 100
+
+            # Create and publish an updated map to /custom_map
+            updated_map = OccupancyGrid()
+            updated_map.header.stamp = rospy.Time.now()
+            updated_map.header.frame_id = "map"
+            updated_map.info.resolution = self.resolution
+            updated_map.info.width = self.map_data.shape[1]
+            updated_map.info.height = self.map_data.shape[0]
+            updated_map.info.origin.position.x = self.origin[0]
+            updated_map.info.origin.position.y = self.origin[1]
+            updated_map.info.origin.position.z = 0
+            updated_map.data = self.map_data.flatten().tolist()
+
+            # Publish the updated map to the /custom_map topic
+            self.map_pub.publish(updated_map)
+    
+    def publish_boundary(self):
+        self.polygon_pub.publish(self.polygon)
+
+    def generate_random_points(self):
+        """Generate random exploration points within the boundary."""
+        self.frontiers = [(random.uniform(self.boundary_min_x, self.boundary_max_x),
+                           random.uniform(self.boundary_min_y, self.boundary_max_y)) for _ in range(self.num_random_points)]
+        self.remaining_frontiers = self.frontiers[:]
+
+    def publish_markers(self):
+        """Publish exploration points as markers."""
+        marker_array = MarkerArray()
+        for i, (x, y) in enumerate(self.frontiers):
+            marker = Marker()
+            marker.header.frame_id = "map"
+            marker.id = i
+            marker.type = Marker.SPHERE
+            marker.action = Marker.ADD
+            marker.pose.position.x = x
+            marker.pose.position.y = y
+            marker.pose.position.z = 0
+            marker.scale.x = 0.1
+            marker.scale.y = 0.1
+            marker.scale.z = 0.1
+    
+            if self.current_goal and self.current_goal == (x, y):
+                marker.color.r = 0.0
+                marker.color.g = 0.0
+                marker.color.b = 1.0
+                marker.color.a = 1.0
+            elif (x, y) in self.remaining_frontiers:
+                marker.color.r = 1.0
+                marker.color.g = 0.0
+                marker.color.b = 0.0
+                marker.color.a = 1.0
+            else:
+                marker.color.r = 0.0
+                marker.color.g = 1.0
+                marker.color.b = 0.0
+                marker.color.a = 1.0
+    
+            marker_array.markers.append(marker)
+
+        self.marker_pub.publish(marker_array)
+
+    def update_frontiers(self):
+        """Update the status of frontiers based on the map with a given tolerance."""
+        new_remaining_frontiers = []
+        resolution_inv = 1 / self.resolution
+
+        goal_reached = False
+
+        for x, y in self.remaining_frontiers:
+            # Convert coordinates to map indices
+            map_x = int((x - self.origin[0]) * resolution_inv)
+            map_y = int((y - self.origin[1]) * resolution_inv)
+
+            # Define the tolerance range in map coordinates
+            min_x = max(0, map_x - self.tolerance)
+            max_x = min(self.map_data.shape[1], map_x + self.tolerance + 1)
+            min_y = max(0, map_y - self.tolerance)
+            max_y = min(self.map_data.shape[0], map_y + self.tolerance + 1)
+
+            # Check the region around the frontier point
+            region = self.map_data[min_y:max_y, min_x:max_x]
+            if np.any(region == 0):  
+                if self.current_goal and self.current_goal == (x, y):
+                    goal_reached = True
+                continue  
+            else:
+                new_remaining_frontiers.append((x, y)) 
+
+        self.remaining_frontiers = new_remaining_frontiers
+
+        if self.current_goal and goal_reached:
+            self.move_to_next_frontier()
+
+    def send_goal(self, x, y):
+        """Send a navigation goal to move_base."""
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = "map"
         goal.target_pose.header.stamp = rospy.Time.now()
-        goal.target_pose.pose.position.x = point[0]
-        goal.target_pose.pose.position.y = point[1]
-        goal.target_pose.pose.orientation.w = 1.0  # Facing forward
-        self.move_base.send_goal(goal)
+        goal.target_pose.pose.position.x = x
+        goal.target_pose.pose.position.y = y
+        goal.target_pose.pose.orientation.w = 1.0
 
-    def return_home(self):
-        """Send the robot back to the starting position."""
-        rospy.loginfo("Returning to home position.")
-        self.set_goal(self.home_position)
+        rospy.loginfo(f"Sending goal: ({x:.2f}, {y:.2f})")
+        self.current_goal = (x, y)
+        self.move_base_client.send_goal(goal)
+
+    def move_to_next_frontier(self):
+        """Move to the next unexplored frontier."""
+        if self.remaining_frontiers:
+            next_frontier = self.find_nearest_frontier()
+            if next_frontier:
+                self.send_goal(*next_frontier)
+        else:
+            self.send_goal(0,0)
+            rospy.loginfo("All frontiers explored.")
+
+    def find_nearest_frontier(self):
+        """Find the nearest unexplored frontier using Manhattan distance."""
+        nearest = None
+        min_distance = float('inf')
+        for x, y in self.remaining_frontiers:
+            distance = abs(x - self.current_position["x"]) + abs(y - self.current_position["y"])
+            if distance < min_distance:
+                min_distance = distance
+                nearest = (x, y)
+        return nearest
+
 
     def explore(self):
-        """Main exploration logic."""
-        robot_position = self.home_position
-        points = self.generate_random_points(1000)
+        """Main exploration loop."""
+        rate = rospy.Rate(10)
+        self.mark_boundary_walls_as_obstacles()
+        self.publish_boundary()
 
-        while True:
-            # Find the nearest unexplored frontier
-            frontier = self.find_nearest_frontier(points, robot_position)
-            if frontier is None:
-                rospy.loginfo("Exploration complete!")
-                break
+        self.move_to_next_frontier()
 
-            # Move to the frontier
-            rospy.loginfo(f"Moving to frontier: {frontier}")
-            self.set_goal(frontier)
-            self.move_base.wait_for_result()
+        while not rospy.is_shutdown():
 
-            # Update robot position after reaching goal
-            state = self.move_base.get_state()
-            if state == GoalStatus.SUCCEEDED:
-                rospy.loginfo("Reached goal successfully.")
-                robot_position = frontier
-            else:
-                rospy.logwarn("Failed to reach goal. Trying next frontier.")
-                points.remove(frontier)
+            self.mark_boundary_walls_as_obstacles()
+            self.publish_boundary()
 
-        # Return to the home position
-        self.return_home()
-        self.move_base.wait_for_result()
+            rate.sleep()
 
-def main():
-    """Run the MazeExplorer node."""
-    explorer = MazeExplorer()
-    rospy.sleep(2)  # Ensure the map is populated
-    explorer.explore()
+        rospy.loginfo("Exploration finished. Shutting down.")
+
 
 if __name__ == '__main__':
     try:
-        main()
+        parser = argparse.ArgumentParser(description='Maze Explorer Parameters')
+        parser.add_argument('--boundary_length', type=float, default=6.0, help='Length of the boundary')
+        parser.add_argument('--boundary_width', type=float, default=6.0, help='Width of the boundary')
+        parser.add_argument('--bound_start_x', type=float, default=-1.0, help='Starting x-coordinate of the boundary')
+        parser.add_argument('--bound_start_y', type=float, default=-1.0, help='Starting y-coordinate of the boundary')
+        parser.add_argument('--num_random_points', type=int, default=200, help='Number of random points for exploration')
+        parser.add_argument('--tolerance', type=int, default=4, help='Tolerance for frontier exploration')
+
+        args = parser.parse_args()
+
+        explorer = MazeExplorer(boundary_length=args.boundary_length,
+                    boundary_width=args.boundary_width,
+                    bound_start_x=args.bound_start_x,
+                    bound_start_y=args.bound_start_y,
+                    num_random_points=args.num_random_points,
+                    tolerance=args.tolerance)
+        
+        explorer.explore()
+        
     except rospy.ROSInterruptException:
-        rospy.loginfo("MazeExplorer interrupted.")
+        rospy.loginfo("Exploration interrupted.")
