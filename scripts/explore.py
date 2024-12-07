@@ -289,9 +289,9 @@ if __name__ == '__main__':
         parser.add_argument('--boundary_width', type=float, default=6.0, help='Width of the boundary')
         parser.add_argument('--bound_start_x', type=float, default=-1.0, help='Starting x-coordinate of the boundary')
         parser.add_argument('--bound_start_y', type=float, default=-1.0, help='Starting y-coordinate of the boundary')
-        parser.add_argument('--num_random_points', type=int, default=200, help='Number of random points for exploration')
+        parser.add_argument('--num_random_points', type=int, default=400, help='Number of random points for exploration')
         parser.add_argument('--tolerance', type=int, default=3, help='Tolerance for frontier exploration')
-        parser.add_argument('--robot_name', type=str, default='tb3_0', help='Name of the robot')
+        parser.add_argument('--robot_name', type=str, default='', help='Name of the robot')
 
         args = parser.parse_args()
 
