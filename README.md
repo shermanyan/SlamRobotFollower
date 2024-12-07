@@ -1,6 +1,17 @@
-## About Project
-The aim of this project was to create a multi robot system with two robots in which they could use data sharing to optimize their behavior. In this case, one robot performed a SLAM mapping of the environment and saved the data collected from that as a 3D world file, which was converted to a 2D JSON map. This data was then used by the second robot to optimize a path out of the maze that it was in using an RTT algorithm without having to do any active object detection. The components used in this scenario were the robots, and then the SLAM and RTT algorithm implementations and finally the data transferring mechanism.
+## Overview
+This project demonstrates a multi-robot system where two robots collaborate using data sharing to optimize their behavior. One robot performs SLAM (Simultaneous Localization and Mapping) to explore the environment, generating a 3D world file. This file is converted into a 2D JSON map, which the second robot uses to plan an optimized path through a maze. The second robot relies entirely on the shared map data and an RRT (Rapidly-Exploring Random Tree) algorithm, eliminating the need for active object detection. The project integrates robotic platforms, SLAM and RRT algorithm implementations, and an efficient data transfer mechanism.
 
+![Demo of SLAM](example/example.gif)
+![RRT example](example/RRT.png)
+
+
+## Platform
+The project was developed using the TurtleBot3 platform and the Robot Operating System (ROS) framework. The simulation was performed using Gazebo and RViz for visualizing the published topics and robot behavior
+
+### Packages:
+
+- Turtlebot3 ```slam_toolbox``` 
+- ROS Navigation ```move_base```
 
 ## System Architecture Description
 Our project’s system architecture involves two TurtleBot robots, each performing specialized tasks. The architecture is divided into two primary components: SLAM and Exploration and Map Processing and Path Planning.
