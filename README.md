@@ -2,7 +2,7 @@
 This project demonstrates a multi-robot system where two robots collaborate using data sharing to optimize their behavior. One robot performs SLAM (Simultaneous Localization and Mapping) to explore the environment, generating a 3D world file. This file is converted into a 2D JSON map, which the second robot uses to plan an optimized path through a maze. The second robot relies entirely on the shared map data and an RRT (Rapidly-Exploring Random Tree) algorithm, eliminating the need for active object detection. The project integrates robotic platforms, SLAM and RRT algorithm implementations, and an efficient data transfer mechanism.
 
 ![Demo of SLAM](example/example.gif)
-![RRT example](example/RRT.png)
+![RRT example](example/rrt.jpeg)
 
 
 ## Platform
