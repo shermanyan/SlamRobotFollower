@@ -14,7 +14,7 @@ The project was developed using the TurtleBot3 platform and the Robot Operating 
 - ROS Navigation ```move_base```
 
 ## System Architecture Description
-Our project’s system architecture involves two TurtleBot robots, each performing specialized tasks. The architecture is divided into two primary components: SLAM and Exploration and Map Processing and Path Planning.
+Our project’s system architecture involves two Turtlebot robots, each performing specialized tasks. The architecture is divided into two primary components: SLAM and Exploration and Map Processing and Path Planning.
 #### SLAM and Exploration:
 This component leverages the TurtleBot slam_toolbox to perform Simultaneous Localization and Mapping (SLAM) while using navigation nodes to explore the environment.
 A Python script, ```explore.py```, implements random dispersion sampling to determine navigation points. These points along with a boundary obstacle are dynamically published as goals to the ```/map``` topic. The script uses Manhattan distance to prioritize unexplored points and updates goals accordingly with tolerance as the robot navigates. This ensures complete map coverage.
