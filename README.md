@@ -33,4 +33,12 @@ After completing the exploration phase, the SLAM-generated map is exported and a
 ```$ rosrun SlamRobotFollower lab10_map.py```
 
 
+## Authors
+* Kip Gorey | [cgorey@usc.edu](mailto:cgorey@usc.edu) | [iotsak1r](https://github.com/kipgorey)
+* Sherman Yan | [shermany@usc.edu](mailto:shermany@usc.edu) | [shermanyan](https://github.com/shermanyan)
+* Mikael Yikum | [yikum@usc.edu](mailto:yikum@usc.edu) | [YikumMikael](https://github.com/YikumMikael)
+
+
+
+
 
