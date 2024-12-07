@@ -15,7 +15,7 @@ The project was developed using the TurtleBot3 platform and the Robot Operating 
 ## System Architecture Description
 Our project’s system architecture involves two Turtlebot robots, each performing specialized tasks. The architecture is divided into two primary components: SLAM and Exploration and Map Processing and Path Planning.
 #### SLAM and Exploration:
-This component leverages the TurtleBot slam_toolbox to perform Simultaneous Localization and Mapping (SLAM) while using navigation nodes to explore the environment.
+This component leverages the Turtlebot slam_toolbox to perform Simultaneous Localization and Mapping (SLAM) while using ROS navigation nodes to explore the environment.
 A Python script, ```explore.py```, implements random dispersion sampling to determine navigation points. These points along with a boundary obstacle are dynamically published as goals to the ```/map``` topic. The script uses Manhattan distance to prioritize unexplored points and updates goals accordingly with tolerance as the robot navigates. This ensures complete map coverage.
 #### Map Processing and Path Planning:
 After completing the exploration phase, the SLAM-generated map is exported and a Python script converts the map data into a ```.json``` format. Using a Rapidly-Exploring Random Tree (RRT) algorithm, the shortest path to the target destination is computed.
